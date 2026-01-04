@@ -2,7 +2,7 @@
 
 > 🤖 基于矽基流动 API 和 Qwen2.5 模型的智能长篇小说生成系统
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/your-username/ai-novel-generator/releases/tag/v0.1.0)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/Cody8722/ai-novel-generator/releases/tag/v0.1.0)
 [![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Test](https://img.shields.io/badge/test-passing-success.svg)](STRESS_TEST_REPORT.md)
@@ -245,8 +245,8 @@ novel_时空裂痕_20260104_143140/
 
 ## 📞 联系方式
 
-- **Issues**: [GitHub Issues](https://github.com/your-username/ai-novel-generator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-username/ai-novel-generator/discussions)
+- **Issues**: [GitHub Issues](https://github.com/Cody8722/ai-novel-generator/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/Cody8722/ai-novel-generator/discussions)
 
 ## ⭐ Star History
 

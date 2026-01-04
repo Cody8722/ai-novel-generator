@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(sc:load)",
+      "Skill(sc:build)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(pip --version:*)",
+      "Bash(echo:*)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(python novel_generator.py:*)",
+      "Bash(python test_generate.py:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -16,20 +16,22 @@ API_CONFIG = {
     'max_retries': 3,
 }
 
-# 🤖 模型角色分配
+# 🤖 模型角色分配（緊急修復：切換為 GLM-4）
 MODEL_ROLES = {
-    'architect': 'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B', # 總編劇：邏輯最強
-    'writer': 'THUDM/glm-4-9b-chat',     # 作家：文筆最好
+    'architect': 'THUDM/glm-4-9b-chat',           # 總編劇：中文能力極強（修復中英混雜問題）
+    'writer': 'THUDM/glm-4-9b-chat',              # 作家：文筆最好
     'editor': 'Qwen/Qwen2.5-Coder-7B-Instruct',   # 編輯：找 Bug 最準
 }
 
 # 🎛️ 參數微調
 ROLE_CONFIGS = {
     'architect': {
-        'temperature': 0.6,
-        'repetition_penalty': 1.05,
-        'max_tokens': 4096,
-        'top_p': 0.9
+        # GLM-4 參數（中文創作優化）
+        # GLM-4 無 <think> 標籤問題，可使用更高創意參數
+        'temperature': 0.7,           # 稍高創意，適合大綱規劃
+        'top_p': 0.9,                 # 更廣泛選擇，增加多樣性
+        'repetition_penalty': 1.1,    # 懲罰重複
+        'max_tokens': 6000            # GLM-4 不需預留 <think> 空間
     },
     'writer': {
         'temperature': 0.95,
@@ -46,21 +48,21 @@ ROLE_CONFIGS = {
 
 # 可用模型列表
 MODELS = {
-    'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B': {
-        'name': 'DeepSeek R1 (總編劇)',
-        'description': '理性思考，適合大綱規劃',
-        'price_input': 0,
-        'price_output': 0
-    },
     'THUDM/glm-4-9b-chat': {
-        'name': 'GLM-4 (作家)',
-        'description': '創意寫作，適合章節生成',
+        'name': 'GLM-4 (全能)',
+        'description': '中文能力極強，適合大綱和寫作',
         'price_input': 0,
         'price_output': 0
     },
     'Qwen/Qwen2.5-Coder-7B-Instruct': {
         'name': 'Qwen Coder (編輯)',
         'description': '精確校對，適合品質檢查',
+        'price_input': 0,
+        'price_output': 0
+    },
+    'deepseek-ai/DeepSeek-R1-Distill-Qwen-7B': {
+        'name': 'DeepSeek R1 (推理)',
+        'description': '邏輯推理強，但不適合中文創作（會中英混雜）',
         'price_input': 0,
         'price_output': 0
     },

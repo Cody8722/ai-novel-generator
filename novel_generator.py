@@ -9,7 +9,7 @@ import argparse
 from dotenv import load_dotenv
 
 from core.generator import NovelGenerator
-from config import MODELS
+from config import MODEL_ROLES
 
 
 def print_banner():
@@ -17,12 +17,18 @@ def print_banner():
     banner = """
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
-║       AI 小說自動生成器 - MVP 版本                        ║
-║       Powered by 矽基流動 + Qwen2.5                      ║
+║       AI 小說自動生成器 - Phase 2.1 增強版                ║
+║       🤖 三模型智能協作系統                               ║
+║       📋 GLM-4 (大綱+寫作) + 🔍 Qwen Coder (編輯)         ║
+║       ✨ 分卷管理 + 反模式引擎                             ║
 ║                                                          ║
 ╚══════════════════════════════════════════════════════════╝
 """
     print(banner)
+    print("\n🤖 智能模型分工（緊急修復版）:")
+    print(f"  📋 總編劇: GLM-4 - 負責大綱規劃（中文能力極強）")
+    print(f"  ✍️  作家: GLM-4 - 負責章節創作與敘事")
+    print(f"  🔍 編輯: Qwen Coder - 負責品質檢查\n")
 
 
 def get_user_input():
@@ -65,32 +71,34 @@ def get_user_input():
     }
 
 
-def select_model():
-    """讓使用者選擇模型"""
-    print("\n請選擇模型：\n")
-
-    models_list = list(MODELS.items())
-    for i, (model_id, model_info) in enumerate(models_list, 1):
-        print(f"{i}. {model_info['name']}")
-        print(f"   {model_info['description']}")
-        print(f"   價格: 輸入/輸出 {model_info['price_input']*1000:.2f}/千tokens\n")
+def ask_enable_phase2():
+    """詢問是否啟用 Phase 2.1 功能"""
+    print("\n" + "="*60)
+    print("🚀 Phase 2.1 增強功能")
+    print("="*60)
+    print("Phase 2.1 包含以下功能:")
+    print("  📚 分卷管理系統 - 自動規劃卷結構")
+    print("  🎭 劇情節奏控制 - 智能衝突升級曲線")
+    print("  ✓ 大綱驗證器 - 防止情節重複")
+    print("  👥 角色弧光強制器 - 保證角色成長")
+    print("  🔗 事件依賴圖 - 檢測情節漏洞")
+    print()
+    print("建議:")
+    print("  • 10 章以下 → 可以不啟用（MVP 模式更快）")
+    print("  • 10-30 章 → 建議啟用")
+    print("  • 30 章以上 → 強烈建議啟用")
+    print("="*60)
 
     while True:
-        choice = input(f"請選擇模型 [1-{len(models_list)}]（直接回車使用預設）: ").strip()
-
-        if not choice:
-            return None  # 使用預設模型
-
-        try:
-            idx = int(choice) - 1
-            if 0 <= idx < len(models_list):
-                selected_model = models_list[idx][0]
-                print(f"✓ 已選擇: {MODELS[selected_model]['name']}\n")
-                return selected_model
-            else:
-                print(f"❌ 請輸入 1-{len(models_list)} 之間的數字")
-        except ValueError:
-            print("❌ 請輸入有效的數字")
+        choice = input("\n是否啟用 Phase 2.1 功能? [Y/n]: ").strip().lower()
+        if choice in ['', 'y', 'yes']:
+            print("✓ 已啟用 Phase 2.1 增強功能\n")
+            return True
+        elif choice in ['n', 'no']:
+            print("✓ 使用 MVP 模式（更快速但功能較少）\n")
+            return False
+        else:
+            print("❌ 請輸入 Y 或 N")
 
 
 def test_api_connection(api_key: str, model: str = None):
@@ -104,9 +112,8 @@ def test_api_connection(api_key: str, model: str = None):
         result = client.generate("請用一句話介紹你自己。", max_tokens=100)
 
         print("✓ API 連接成功")
-        print(f"  模型回應: {result['content'][:50]}...")
-        print(f"  Token 使用: {result['tokens_input']} + {result['tokens_output']}")
-        print(f"  成本: ¥{result['cost']:.4f}\n")
+        print(f"  模型回應: {result[:50]}...")
+        print()
         return True
 
     except Exception as e:
@@ -147,14 +154,11 @@ def main():
         test_api_connection(api_key, args.model)
         return
 
-    # 選擇模型
-    if args.model:
-        selected_model = args.model
-    else:
-        selected_model = select_model()
-
     # 獲取使用者輸入
     user_input = get_user_input()
+
+    # 詢問是否啟用 Phase 2.1
+    enable_phase2 = ask_enable_phase2()
 
     # 確認信息
     print("\n" + "="*60)
@@ -164,10 +168,10 @@ def main():
     print(f"類型: {user_input['genre']}")
     print(f"主題: {user_input['theme']}")
     print(f"章節數: {user_input['total_chapters']}")
-    if selected_model:
-        print(f"模型: {MODELS[selected_model]['name']}")
-    else:
-        print(f"模型: 預設 (Qwen2.5-7B)")
+    print(f"模型協作: 三模型智能分工")
+    print(f"  📋 DeepSeek R1 → 大綱規劃")
+    print(f"  ✍️  GLM-4 → 章節創作")
+    print(f"模式: {'Phase 2.1 增強版' if enable_phase2 else 'MVP 基礎版'}")
     print("="*60)
 
     confirm = input("\n確認開始生成? [Y/n]: ")
@@ -176,9 +180,9 @@ def main():
         return
 
     try:
-        # 初始化生成器
+        # 初始化生成器（使用 Architect 模型作為主模型）
         print("\n⏳ 初始化生成器...")
-        generator = NovelGenerator(api_key, selected_model)
+        generator = NovelGenerator(api_key, MODEL_ROLES['architect'], enable_phase2=enable_phase2)
 
         # 建立專案
         generator.create_project(
@@ -228,11 +232,25 @@ def main():
         print(f"已生成章節: {stats['chapters_generated']}/{stats['total_chapters']}")
         print(f"總字數: {stats['total_words']:,}")
         print(f"總成本: ¥{stats['api_statistics']['total_cost']:.4f}")
+
+        # Phase 2.1 額外統計
+        if 'phase2_stats' in stats:
+            p2_stats = stats['phase2_stats']
+            print(f"\n📚 分卷信息:")
+            print(f"  總卷數: {p2_stats.get('total_volumes', 0)}")
+            print(f"  當前卷: {p2_stats.get('current_volume', 1)}")
+            print(f"  大綱驗證: {'✓ 已啟用' if p2_stats.get('validation_enabled') else '未啟用'}")
+
         print("="*60)
 
         print("\n生成的文件:")
         print(f"  📋 大綱: outline.txt")
-        print(f"  📖 章節: chapter_001.txt ~ chapter_{stats['total_chapters']:03d}.txt")
+        if enable_phase2 and 'phase2_stats' in stats:
+            print(f"  📚 分卷規劃: volume_plan.json")
+            print(f"  📖 卷大綱: volumes/volume_N/outline.txt")
+        print(f"  📄 章節: chapter_001.txt ~ chapter_{stats['total_chapters']:03d}.txt")
+        if enable_phase2:
+            print(f"  📊 章節元數據: chapter_NNN_metadata.json")
         print(f"  📚 完整小說: full_novel.txt")
         print(f"  ℹ️  元數據: metadata.json")
 

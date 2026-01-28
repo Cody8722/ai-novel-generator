@@ -5,8 +5,8 @@ AI 小說生成器 - 配置文件
 """
 
 # 專案版本
-VERSION = '0.2.0'
-VERSION_NAME = 'DeepSeek R1 & GLM-4 Edition'
+VERSION = '0.3.0'
+VERSION_NAME = 'Dynamic Stage Params Edition'
 
 # API 配置
 API_CONFIG = {
@@ -88,4 +88,41 @@ PROJECT_CONFIG = {
 LOGGING_CONFIG = {
     'level': 'INFO',
     'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+}
+
+# 🎯 動態階段參數配置 (基於 305 組測試)
+ENABLE_DYNAMIC_STAGE_PARAMS = True
+
+# 階段參數配置 (冠軍配置: temp=0.68, top_p=0.91, penalty=1.06, score=90.25)
+STAGE_PARAMS = {
+    'OUTLINE': {
+        'temperature': 0.68,
+        'top_p': 0.91,
+        'repetition_penalty': 1.06,
+        'max_tokens': 6000,
+    },
+    'OPENING': {  # 0-10%
+        'temperature': 0.65,
+        'top_p': 0.92,
+        'repetition_penalty': 1.02,
+        'max_tokens': 5000,
+    },
+    'DEVELOPMENT': {  # 10-80%
+        'temperature': 0.85,
+        'top_p': 0.93,
+        'repetition_penalty': 1.03,
+        'max_tokens': 5000,
+    },
+    'CLIMAX': {  # 80-93%
+        'temperature': 0.75,
+        'top_p': 0.88,
+        'repetition_penalty': 1.03,
+        'max_tokens': 6000,
+    },
+    'ENDING': {  # 93-100%
+        'temperature': 0.68,
+        'top_p': 0.91,
+        'repetition_penalty': 1.06,
+        'max_tokens': 5000,
+    },
 }

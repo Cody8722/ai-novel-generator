@@ -22,11 +22,125 @@ class SiliconFlowClient:
         self.timeout = API_CONFIG['timeout']
         self.max_retries = API_CONFIG['max_retries']
 
+        # 動態參數（可通過 update_params 更新）
+        self._dynamic_params = {
+            'temperature': None,
+            'top_p': None,
+            'repetition_penalty': None,
+            'max_tokens': None
+        }
+        self._dynamic_params_enabled = False
+
         # 統計
         self.total_tokens_input = 0
         self.total_tokens_output = 0
         self.total_cost = 0.0
         self.request_count = 0
+        self._param_change_count = 0
+
+    def update_params(
+        self,
+        new_params: Dict,
+        log_change: bool = True
+    ) -> Dict:
+        """
+        動態更新生成參數
+
+        支持更新的參數：
+        - temperature: 溫度參數（控制隨機性）
+        - top_p: 核採樣參數（控制詞彙多樣性）
+        - repetition_penalty: 重複懲罰（避免重複內容）
+        - max_tokens: 最大生成 token 數
+
+        Args:
+            new_params: 新參數字典
+            log_change: 是否記錄參數變更日誌
+
+        Returns:
+            更新後的參數字典
+
+        Example:
+            client.update_params({
+                'temperature': 0.68,
+                'top_p': 0.91,
+                'repetition_penalty': 1.06
+            })
+        """
+        old_params = self._dynamic_params.copy()
+        changed = []
+
+        for key in ['temperature', 'top_p', 'repetition_penalty', 'max_tokens']:
+            if key in new_params and new_params[key] is not None:
+                old_value = self._dynamic_params.get(key)
+                new_value = new_params[key]
+
+                if old_value != new_value:
+                    self._dynamic_params[key] = new_value
+                    changed.append(f"{key}: {old_value} -> {new_value}")
+
+        if changed:
+            self._dynamic_params_enabled = True
+            self._param_change_count += 1
+
+            if log_change:
+                logger.info(f"參數更新 [#{self._param_change_count}]: {', '.join(changed)}")
+
+        return self._dynamic_params.copy()
+
+    def get_current_params(self) -> Dict:
+        """
+        獲取當前動態參數
+
+        Returns:
+            當前參數字典
+        """
+        return {k: v for k, v in self._dynamic_params.items() if v is not None}
+
+    def reset_params(self) -> None:
+        """重置動態參數為默認值"""
+        self._dynamic_params = {
+            'temperature': None,
+            'top_p': None,
+            'repetition_penalty': None,
+            'max_tokens': None
+        }
+        self._dynamic_params_enabled = False
+        logger.info("動態參數已重置")
+
+    def enable_dynamic_params(self) -> None:
+        """啟用動態參數"""
+        self._dynamic_params_enabled = True
+        logger.info("動態參數已啟用")
+
+    def disable_dynamic_params(self) -> None:
+        """禁用動態參數（使用默認參數）"""
+        self._dynamic_params_enabled = False
+        logger.info("動態參數已禁用")
+
+    def is_dynamic_params_enabled(self) -> bool:
+        """檢查動態參數是否啟用"""
+        return self._dynamic_params_enabled
+
+    def _merge_params(self, kwargs: Dict) -> Dict:
+        """
+        合併動態參數和調用時參數
+
+        優先級：調用時參數 > 動態參數 > 默認值
+
+        Args:
+            kwargs: 調用時傳入的參數
+
+        Returns:
+            合併後的參數字典
+        """
+        merged = kwargs.copy()
+
+        if self._dynamic_params_enabled:
+            for key, value in self._dynamic_params.items():
+                if value is not None and key not in kwargs:
+                    merged[key] = value
+
+        return merged
 
     def generate(self, prompt: str, model: str = None, **kwargs) -> str:
         """
@@ -43,11 +157,14 @@ class SiliconFlowClient:
         target_model = model or self.model
         messages = [{"role": "user", "content": prompt}]
 
+        # 合併動態參數
+        merged_kwargs = self._merge_params(kwargs)
+
         payload = {
             "model": target_model,
             "messages": messages,
             "stream": False,
-            **kwargs
+            **merged_kwargs
         }
 
         headers = {
@@ -219,7 +336,10 @@ class SiliconFlowClient:
             'model': self.model,
             'request_count': self.request_count,
             'total_tokens': self.total_tokens_input + self.total_tokens_output,
-            'total_cost': 0.0  # 免費模型，成本為 0
+            'total_cost': 0.0,  # 免費模型，成本為 0
+            'param_change_count': self._param_change_count,
+            'dynamic_params_enabled': self._dynamic_params_enabled,
+            'current_params': self.get_current_params()
         }
 
     def print_statistics(self):
@@ -235,6 +355,13 @@ class SiliconFlowClient:
         print(f"  ├─ 輸入............... {self.total_tokens_input:,}")
         print(f"  └─ 輸出............... {self.total_tokens_output:,}")
         print(f"總成本.................. ¥{stats['total_cost']:.4f} (免費)")
+        print("-"*60)
+        print(f"動態參數................ {'✅ 啟用' if stats['dynamic_params_enabled'] else '❌ 禁用'}")
+        print(f"參數變更次數............ {stats['param_change_count']}")
+        if stats['current_params']:
+            print("當前參數:")
+            for key, value in stats['current_params'].items():
+                print(f"  └─ {key}: {value}")
         print("="*60 + "\n")
 
 

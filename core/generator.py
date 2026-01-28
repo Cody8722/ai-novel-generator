@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from core.api_client import SiliconFlowClient
+from core.stage_config import StageConfigManager, NovelStage
 from templates.prompts import PromptTemplates
 from config import PROJECT_CONFIG, GENERATION_CONFIG, MODEL_ROLES, ROLE_CONFIGS
 
@@ -27,7 +28,13 @@ class NovelGenerator:
     管理專案、生成大綱和章節
     """
 
-    def __init__(self, api_key: str, model: str = None, enable_phase2: bool = False):
+    def __init__(
+        self,
+        api_key: str,
+        model: str = None,
+        enable_phase2: bool = False,
+        enable_stage_config: bool = True
+    ):
         """
         初始化生成器
 
@@ -35,10 +42,15 @@ class NovelGenerator:
             api_key: API Key
             model: 模型名稱（可選）
             enable_phase2: 是否啟用 Phase 2.1 功能（分卷管理 + 反模式引擎）
+            enable_stage_config: 是否啟用動態階段參數配置（默認啟用）
         """
         self.api_client = SiliconFlowClient(api_key, model)
         self.prompt_templates = PromptTemplates()
         self.enable_phase2 = enable_phase2
+        self.enable_stage_config = enable_stage_config
+
+        # 動態階段參數配置管理器
+        self.stage_config_manager = StageConfigManager(enabled=enable_stage_config)
 
         # 專案信息
         self.project_dir = None
@@ -65,6 +77,10 @@ class NovelGenerator:
             logger.info("小說生成器初始化完成（Phase 2.1 已啟用）")
         else:
             logger.info("小說生成器初始化完成（MVP 模式）")
+
+        # 日誌記錄動態參數狀態
+        stage_status = "啟用" if self.enable_stage_config else "禁用"
+        logger.info(f"動態階段參數: {stage_status}")
 
     def _init_phase2_managers(self):
         """
@@ -219,11 +235,23 @@ class NovelGenerator:
             total_chapters=self.metadata['total_chapters']
         )
 
-        # 調用 API (使用 Architect 模型 + R1 官方推薦參數)
+        # 獲取階段配置（大綱階段）
+        if self.enable_stage_config:
+            stage_config = self.stage_config_manager.get_config(NovelStage.OUTLINE)
+            stage_params = stage_config.to_api_params()
+            # 更新 API 客戶端參數
+            self.api_client.update_params(stage_params)
+            logger.info(f"使用大綱階段配置: temp={stage_params['temperature']}, "
+                       f"top_p={stage_params['top_p']}, penalty={stage_params['repetition_penalty']}")
+            api_params = stage_params
+        else:
+            api_params = ROLE_CONFIGS['architect']  # 使用默認參數
+
+        # 調用 API (使用 Architect 模型)
         result = self.api_client.generate_with_details(
             prompt=prompt,
             model=MODEL_ROLES['architect'],
-            **ROLE_CONFIGS['architect']  # 使用 R1 官方推薦參數
+            **api_params
         )
 
         content = result['content']
@@ -331,7 +359,26 @@ class NovelGenerator:
 
     def _generate_chapter_mvp(self, chapter_num: int) -> Dict:
         """MVP 模式章節生成（向後兼容）"""
-        print(f"⏳ 正在生成第 {chapter_num} 章...")
+        total_chapters = self.metadata['total_chapters']
+
+        # 獲取階段配置
+        if self.enable_stage_config:
+            stage_config, stage = self.stage_config_manager.get_config_by_chapter(
+                chapter_num, total_chapters
+            )
+            stage_params = stage_config.to_api_params()
+            # 更新 API 客戶端參數
+            self.api_client.update_params(stage_params)
+            print(f"⏳ 正在生成第 {chapter_num} 章 [{stage.name}]...")
+            logger.info(f"章節 {chapter_num}/{total_chapters} 使用 {stage.name} 配置: "
+                       f"temp={stage_params['temperature']}, top_p={stage_params['top_p']}, "
+                       f"penalty={stage_params['repetition_penalty']}")
+        else:
+            print(f"⏳ 正在生成第 {chapter_num} 章...")
+            stage_params = {
+                'temperature': GENERATION_CONFIG['temperature'],
+                'max_tokens': GENERATION_CONFIG['max_tokens']
+            }
 
         # 獲取上一章內容
         previous_chapter = ""
@@ -347,7 +394,7 @@ class NovelGenerator:
         # 構建提示詞
         prompt = self.prompt_templates.build_chapter_prompt(
             chapter_num=chapter_num,
-            total_chapters=self.metadata['total_chapters'],
+            total_chapters=total_chapters,
             outline=self.outline,
             previous_chapter=previous_chapter
         )
@@ -355,9 +402,8 @@ class NovelGenerator:
         # 調用 API (使用 Writer 模型生成章節)
         result = self.api_client.generate_with_details(
             prompt=prompt,
-            temperature=GENERATION_CONFIG['temperature'],
-            max_tokens=GENERATION_CONFIG['max_tokens'],
-            model=MODEL_ROLES['writer']
+            model=MODEL_ROLES['writer'],
+            **stage_params
         )
 
         chapter_content = result['content']
@@ -405,7 +451,20 @@ class NovelGenerator:
         9. 生成章節內容 (使用 Phase 2 prompt)
         10. 更新角色狀態和事件圖
         """
-        print(f"⏳ [Phase 2.1] 正在生成第 {chapter_num} 章...")
+        total_chapters = self.metadata['total_chapters']
+
+        # 獲取階段配置
+        if self.enable_stage_config:
+            stage_config, stage = self.stage_config_manager.get_config_by_chapter(
+                chapter_num, total_chapters
+            )
+            stage_params = stage_config.to_api_params()
+            # 更新 API 客戶端參數
+            self.api_client.update_params(stage_params)
+            print(f"⏳ [Phase 2.1] 正在生成第 {chapter_num} 章 [{stage.name}]...")
+            logger.info(f"章節 {chapter_num}/{total_chapters} 使用 {stage.name} 配置")
+        else:
+            print(f"⏳ [Phase 2.1] 正在生成第 {chapter_num} 章...")
 
         # === 步驟 1: 載入卷大綱和卷摘要 ===
         volume_context = self._load_volume_context(chapter_num)
@@ -593,8 +652,16 @@ class NovelGenerator:
             'chapters_generated': len(self.chapters),
             'total_chapters': self.metadata.get('total_chapters', 0),
             'total_words': total_words,
-            'api_statistics': api_stats
+            'api_statistics': api_stats,
+            'stage_config_enabled': self.enable_stage_config
         }
+
+        # 動態階段參數統計
+        if self.enable_stage_config and api_stats.get('param_change_count', 0) > 0:
+            stats['stage_config_stats'] = {
+                'param_changes': api_stats['param_change_count'],
+                'current_params': api_stats.get('current_params', {})
+            }
 
         # Phase 2.1 額外統計
         if self.enable_phase2 and self.volume_plan:
@@ -814,12 +881,23 @@ class NovelGenerator:
             event_context=event_context
         )
 
+        # 獲取階段配置
+        if self.enable_stage_config:
+            stage_config, stage = self.stage_config_manager.get_config_by_chapter(
+                chapter_num, self.metadata['total_chapters']
+            )
+            stage_params = stage_config.to_api_params()
+        else:
+            stage_params = {
+                'temperature': GENERATION_CONFIG['temperature'],
+                'max_tokens': GENERATION_CONFIG['max_tokens']
+            }
+
         # 調用 API 生成 (使用 Writer 模型生成章節內容)
         result = self.api_client.generate_with_details(
             prompt=prompt,
-            temperature=GENERATION_CONFIG['temperature'],
-            max_tokens=GENERATION_CONFIG['max_tokens'],
-            model=MODEL_ROLES['writer']
+            model=MODEL_ROLES['writer'],
+            **stage_params
         )
 
         return result['content'], result

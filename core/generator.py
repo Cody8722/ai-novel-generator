@@ -399,6 +399,13 @@ class NovelGenerator:
             previous_chapter=previous_chapter
         )
 
+        # V0.3.1: 添加字數控制提示
+        if self.enable_stage_config:
+            word_count_hint = stage_config.get_word_count_hint()
+            if word_count_hint:
+                prompt += f"\n\n【字數要求】{word_count_hint}"
+                logger.debug(f"章節 {chapter_num} 添加字數控制提示: {stage_config.target_words}")
+
         # 調用 API (使用 Writer 模型生成章節)
         result = self.api_client.generate_with_details(
             prompt=prompt,
@@ -887,6 +894,12 @@ class NovelGenerator:
                 chapter_num, self.metadata['total_chapters']
             )
             stage_params = stage_config.to_api_params()
+
+            # V0.3.1: 添加字數控制提示
+            word_count_hint = stage_config.get_word_count_hint()
+            if word_count_hint:
+                prompt += f"\n\n【字數要求】{word_count_hint}"
+                logger.debug(f"章節 {chapter_num} 添加字數控制提示: {stage_config.target_words}")
         else:
             stage_params = {
                 'temperature': GENERATION_CONFIG['temperature'],
@@ -990,29 +1003,83 @@ class NovelGenerator:
         )
 
     def _finalize_volume(self, volume_id: int):
-        """完成當前卷（生成摘要）"""
+        """
+        完成當前卷（生成摘要）
+
+        Args:
+            volume_id: 卷號
+
+        修復版本: V0.3.1
+        - 修復缺少 chapter_contents 參數的問題
+        - 添加完整的章節內容收集邏輯
+        - 保存摘要到正確路徑
+        """
         print(f"\n📚 正在完成第 {volume_id} 卷...")
 
-        if not self.volume_manager:
+        if not self.volume_manager or not self.volume_plan:
+            logger.warning("分卷管理器未初始化，跳過卷摘要生成")
             return
 
         try:
+            # 獲取本卷信息
+            if volume_id < 1 or volume_id > len(self.volume_plan['volumes']):
+                logger.error(f"無效的卷號: {volume_id}")
+                return
+
+            volume_info = self.volume_plan['volumes'][volume_id - 1]
+            start_chapter = int(volume_info['start_chapter'])
+            end_chapter = int(volume_info['end_chapter'])
+
+            logger.info(f"收集第 {volume_id} 卷章節內容: 第 {start_chapter}-{end_chapter} 章")
+
+            # 收集本卷所有章節內容
+            chapter_contents = []
+            for ch_num in range(start_chapter, end_chapter + 1):
+                chapter_file = os.path.join(
+                    self.project_dir,
+                    PROJECT_CONFIG['chapter_filename_format'].format(ch_num)
+                )
+
+                if os.path.exists(chapter_file):
+                    with open(chapter_file, 'r', encoding=PROJECT_CONFIG['encoding']) as f:
+                        chapter_contents.append(f.read())
+                    logger.debug(f"已讀取第 {ch_num} 章")
+                else:
+                    logger.warning(f"第 {ch_num} 章文件不存在: {chapter_file}")
+                    chapter_contents.append(f"（第 {ch_num} 章內容缺失）")
+
+            if not chapter_contents:
+                logger.warning(f"第 {volume_id} 卷沒有章節內容，跳過摘要生成")
+                return
+
+            print(f"  📖 已收集 {len(chapter_contents)} 章內容")
+
             # 生成卷摘要 (使用 Architect 模型)
-            summary_result = self.volume_manager.generate_volume_summary(
+            # 修復：傳入 chapter_contents 參數
+            summary = self.volume_manager.generate_volume_summary(
                 volume_num=volume_id,
+                chapter_contents=chapter_contents,
                 api_generator_func=lambda prompt: self.api_client.generate_with_details(
                     prompt=prompt,
                     temperature=GENERATION_CONFIG['temperature'],
                     max_tokens=2000,
                     model=MODEL_ROLES['architect']
-                )
+                )['content']  # 注意：返回內容而非完整結果
             )
 
-            if summary_result.get('success'):
-                print(f"✓ 第 {volume_id} 卷摘要已生成")
-                print(f"  摘要: {summary_result['summary'][:100]}...")
-            else:
-                logger.warning(f"第 {volume_id} 卷摘要生成失敗")
+            # 保存摘要到正確路徑
+            volume_dir = os.path.join(self.project_dir, 'volumes', f'volume_{volume_id}')
+            os.makedirs(volume_dir, exist_ok=True)
+            summary_file = os.path.join(volume_dir, 'summary.txt')
+
+            with open(summary_file, 'w', encoding=PROJECT_CONFIG['encoding']) as f:
+                f.write(summary)
+
+            print(f"✓ 第 {volume_id} 卷摘要已生成")
+            print(f"  摘要: {summary[:100]}...")
+            print(f"  已儲存: {summary_file}")
+
+            logger.info(f"第 {volume_id} 卷摘要已保存: {summary_file}")
 
         except Exception as e:
             logger.error(f"完成第 {volume_id} 卷時發生錯誤: {e}")

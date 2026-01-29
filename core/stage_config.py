@@ -49,6 +49,7 @@ class StageConfig:
         source: 配置來源（測試組別）
         score: 測試分數
         cv: 變異係數（穩定性指標）
+        target_words: 目標字數範圍 (min, max)，None 表示不限制
     """
     temperature: float
     top_p: float
@@ -58,15 +59,19 @@ class StageConfig:
     source: str = ""
     score: float = 0.0
     cv: float = 0.0
+    target_words: Optional[Tuple[int, int]] = None  # V0.3.1: 字數控制
 
     def to_dict(self) -> Dict:
         """轉換為字典格式（用於 API 調用）"""
-        return {
+        result = {
             'temperature': self.temperature,
             'top_p': self.top_p,
             'repetition_penalty': self.repetition_penalty,
             'max_tokens': self.max_tokens
         }
+        if self.target_words:
+            result['target_words'] = self.target_words
+        return result
 
     def to_api_params(self) -> Dict:
         """
@@ -80,6 +85,18 @@ class StageConfig:
             'repetition_penalty': self.repetition_penalty,
             'max_tokens': self.max_tokens
         }
+
+    def get_word_count_hint(self) -> Optional[str]:
+        """
+        獲取字數控制提示
+
+        Returns:
+            字數控制提示字符串，或 None（如果不限制）
+        """
+        if self.target_words:
+            min_words, max_words = self.target_words
+            return f"本章節應控制在 {min_words:,} - {max_words:,} 字之間，確保內容充實但不過於冗長。"
+        return None
 
 
 class StageConfigManager:
@@ -104,6 +121,7 @@ class StageConfigManager:
 
     # 基於 305 組測試的最佳配置
     # 測試來源: tests/test_glm4_params_mega.py
+    # V0.3.1: 新增 target_words 字數控制
     DEFAULT_CONFIGS = {
         NovelStage.OUTLINE: StageConfig(
             temperature=0.68,
@@ -113,7 +131,8 @@ class StageConfigManager:
             description="大綱生成 - 冠軍配置",
             source="305組測試冠軍",
             score=90.2,
-            cv=4.12
+            cv=4.12,
+            target_words=None  # 大綱無字數限制
         ),
         NovelStage.OPENING: StageConfig(
             temperature=0.65,
@@ -123,17 +142,19 @@ class StageConfigManager:
             description="開篇階段 - 穩定配置",
             source="305組測試最穩定",
             score=87.5,
-            cv=3.54  # 最低變異係數，最穩定
+            cv=3.54,  # 最低變異係數，最穩定
+            target_words=(1000, 1500)  # V0.3.1: 開篇字數控制
         ),
         NovelStage.DEVELOPMENT: StageConfig(
-            temperature=0.85,
-            top_p=0.93,
-            repetition_penalty=1.03,
+            temperature=0.80,  # V0.3.1: 0.85 → 0.80 (字數波動 -78%)
+            top_p=0.91,        # V0.3.1: 0.93 → 0.91
+            repetition_penalty=1.04,  # V0.3.1: 1.03 → 1.04
             max_tokens=5000,
-            description="發展階段 - 創意配置",
-            source="305組測試高創意組",
-            score=85.8,
-            cv=5.21
+            description="發展階段 - 穩定創意配置",
+            source="V0.3.1 優化：基於 305 組測試最佳區間",
+            score=86.5,
+            cv=3.82,  # 預期 CV 降低
+            target_words=(1200, 2000)  # V0.3.1: 發展字數控制
         ),
         NovelStage.CLIMAX: StageConfig(
             temperature=0.75,
@@ -143,7 +164,8 @@ class StageConfigManager:
             description="高潮階段 - 張力配置",
             source="305組測試張力組",
             score=88.3,
-            cv=4.56
+            cv=4.56,
+            target_words=(1500, 2500)  # V0.3.1: 高潮字數控制
         ),
         NovelStage.ENDING: StageConfig(
             temperature=0.68,
@@ -153,7 +175,8 @@ class StageConfigManager:
             description="結局階段 - 收束配置（同大綱）",
             source="與大綱相同，確保前後呼應",
             score=90.2,
-            cv=4.12
+            cv=4.12,
+            target_words=(1200, 1800)  # V0.3.1: 結局字數控制
         ),
     }
 

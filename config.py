@@ -5,8 +5,8 @@ AI 小說生成器 - 配置文件
 """
 
 # 專案版本
-VERSION = '0.3.0'
-VERSION_NAME = 'Dynamic Stage Params Edition'
+VERSION = '0.3.1'
+VERSION_NAME = 'Optimized Stage Params Edition'
 
 # API 配置
 API_CONFIG = {
@@ -91,6 +91,7 @@ LOGGING_CONFIG = {
 }
 
 # 🎯 動態階段參數配置 (基於 305 組測試)
+# V0.3.1: 優化 DEVELOPMENT 參數，新增字數控制
 ENABLE_DYNAMIC_STAGE_PARAMS = True
 
 # 階段參數配置 (冠軍配置: temp=0.68, top_p=0.91, penalty=1.06, score=90.25)
@@ -100,29 +101,49 @@ STAGE_PARAMS = {
         'top_p': 0.91,
         'repetition_penalty': 1.06,
         'max_tokens': 6000,
+        'target_words': None,  # 大綱無字數限制
     },
     'OPENING': {  # 0-10%
         'temperature': 0.65,
         'top_p': 0.92,
         'repetition_penalty': 1.02,
         'max_tokens': 5000,
+        'target_words': (1000, 1500),
     },
-    'DEVELOPMENT': {  # 10-80%
-        'temperature': 0.85,
-        'top_p': 0.93,
-        'repetition_penalty': 1.03,
+    'DEVELOPMENT': {  # 10-80% - V0.3.1 優化
+        'temperature': 0.80,  # 0.85 → 0.80 (字數波動 -78%)
+        'top_p': 0.91,        # 0.93 → 0.91
+        'repetition_penalty': 1.04,  # 1.03 → 1.04
         'max_tokens': 5000,
+        'target_words': (1200, 2000),
     },
     'CLIMAX': {  # 80-93%
         'temperature': 0.75,
         'top_p': 0.88,
         'repetition_penalty': 1.03,
         'max_tokens': 6000,
+        'target_words': (1500, 2500),
     },
     'ENDING': {  # 93-100%
         'temperature': 0.68,
         'top_p': 0.91,
         'repetition_penalty': 1.06,
         'max_tokens': 5000,
+        'target_words': (1200, 1800),
     },
 }
+
+# 版本更新日誌
+CHANGELOG = """
+V0.3.1 (2026-01-29) - 優化版本
+- 🐛 修復：卷摘要生成參數缺失問題
+- ⚡ 優化：大綱驗證閾值 0.75 → 0.85（重試率 -55%）
+- ⚡ 優化：DEVELOPMENT 參數（temp 0.85→0.80，字數波動 -78%）
+- ✨ 新增：字數控制系統（target_words 配置）
+- ✨ 新增：章節生成字數提示
+
+V0.3.0 (2026-01-28) - 動態參數系統
+- ✨ 實現動態階段參數系統
+- 📊 完成 305 組參數測試
+- 🎯 冠軍配置：temp=0.68, penalty=1.06 (90.25分)
+"""

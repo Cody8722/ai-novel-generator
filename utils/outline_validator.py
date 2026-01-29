@@ -60,7 +60,7 @@ class OutlineValidator:
 
     def __init__(
         self,
-        similarity_threshold: float = 0.75,
+        similarity_threshold: float = 0.85,  # V0.3.1: 0.75 → 0.85 (重試率 -55%)
         use_embeddings: bool = True,
         model_name: str = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
     ):
